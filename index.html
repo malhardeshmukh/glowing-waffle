@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AlphaFold Human Proteome Structure Atlas</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --vhigh: #00f5d4; --high: #3a86ff; --med: #ffb703; --low: #ff6b6b;
+    --bg: #070d1a; --card: #0e1829; --card2: #0b1523; --border: #1a2d4a;
+    --text: #e0eaff; --muted: #5a7a9a; --accent: #c77dff; --accent2: #f72585;
+    --green: #06d6a0; --orange: #fb8500;
+    --mono: 'Space Mono', monospace;
+    --serif: 'Crimson Pro', Georgia, serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--mono);
+    min-height: 100vh; font-size: 13px; line-height: 1.5;
+  }
+
+  /* ── Molecular BG ── */
+  #mol-bg {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .035;
+  }
+
+  /* ── Layout ── */
+  #app { position: relative; z-index: 1; }
+  .header {
+    padding: 24px 28px 0; border-bottom: 1px solid var(--border);
+  }
+  .header-top {
+    display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .header-title h1 {
+    font-family: var(--serif); font-size: clamp(17px, 3.5vw, 28px);
+    font-weight: 600; line-height: 1.2; color: var(--text);
+  }
+  .header-title h1 span { color: var(--vhigh); }
+  .header-title .byline {
+    font-size: 9px; letter-spacing: .2em; color: var(--muted); margin-bottom: 6px; text-transform: uppercase;
+  }
+  .header-title .sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Stats ── */
+  .stats { display: flex; gap: 24px; margin-left: auto; flex-wrap: wrap; }
+  .stat { text-align: center; }
+  .stat-val {
+    font-size: clamp(16px, 3vw, 26px); font-weight: 700; font-family: var(--mono);
+    color: var(--vhigh);
+  }
+  .stat-label { font-size: 8px; letter-spacing: .12em; color: var(--muted); margin-top: 2px; text-transform: uppercase; }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 2px; overflow-x: auto; padding-bottom: 0; }
+  .tab-btn {
+    background: transparent; color: var(--muted); border: 1px solid var(--border);
+    border-bottom: none; border-radius: 5px 5px 0 0; padding: 7px 14px;
+    font-size: 9px; cursor: pointer; font-family: var(--mono);
+    letter-spacing: .1em; text-transform: uppercase; transition: all .15s;
+    white-space: nowrap;
+  }
+  .tab-btn.active {
+    background: var(--vhigh); color: var(--bg); border-color: var(--vhigh); font-weight: 700;
+  }
+  .tab-btn:hover:not(.active) { color: var(--text); border-color: var(--muted); }
+
+  /* ── Content ── */
+  .content { padding: 24px 28px; max-width: 1140px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ── Grid ── */
+  .grid { display: grid; gap: 18px; }
+  .grid-auto { grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3-2 { grid-template-columns: 3fr 2fr; }
+  .col-span { grid-column: 1 / -1; }
+  @media (max-width: 700px) {
+    .grid-2, .grid-3-2 { grid-template-columns: 1fr; }
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px;
+  }
+  .card-title {
+    font-size: 9px; letter-spacing: .18em; color: var(--muted); margin-bottom: 14px; text-transform: uppercase;
+  }
+
+  /* ── HBar ── */
+  .hbar { margin-bottom: 12px; }
+  .hbar-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .hbar-label { color: var(--text); font-size: 11px; }
+  .hbar-val { font-weight: 700; font-size: 12px; font-family: var(--mono); }
+  .hbar-track { background: var(--border); border-radius: 3px; height: 8px; position: relative; overflow: hidden; }
+  .hbar-fill { height: 100%; border-radius: 3px; opacity: .85; transition: width .8s cubic-bezier(.16,1,.3,1); }
+  .hbar-note { font-size: 9px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+  /* ── Tag ── */
+  .tag {
+    display: inline-block; font-size: 9px; padding: 2px 7px; border-radius: 99px;
+    font-family: var(--mono); border: 1px solid; white-space: nowrap;
+  }
+
+  /* ── Callout ── */
+  .callout {
+    margin-top: 12px; padding: 10px 14px; border-radius: 7px; border: 1px solid;
+    font-size: 11px; line-height: 1.65; color: var(--text);
+  }
+
+  /* ── KV Row ── */
+  .kv { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border); align-items: flex-start; gap: 10px; }
+  .kv-label { color: var(--text); font-size: 11px; }
+  .kv-sub { color: var(--muted); font-size: 9px; margin-top: 1px; }
+  .kv-val { font-weight: 700; font-family: var(--mono); font-size: 12px; flex-shrink: 0; }
+
+  /* ── Band ── */
+  .band { margin-bottom: 16px; }
+  .band-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .band-label { color: var(--text); font-size: 12px; }
+  .band-pct { font-weight: 700; font-size: 14px; font-family: var(--mono); }
+  .band-bar { background: var(--border); border-radius: 3px; height: 9px; }
+  .band-fill { height: 100%; border-radius: 3px; opacity: .85; }
+  .band-desc { color: var(--muted); font-size: 10px; margin-top: 3px; line-height: 1.4; }
+
+  /* ── Stacked bar (disorder resolution) ── */
+  .stacked-bar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; }
+
+  /* ── Sequence length stacked ── */
+  .seqlen-row { margin-bottom: 12px; }
+  .seqlen-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .seqlen-bar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; gap: 1px; }
+  .seqlen-leg { display: flex; gap: 12px; margin-top: 2px; }
+  .seqlen-leg span { font-size: 9px; }
+
+  /* ── Method step ── */
+  .method-step {
+    padding: 14px 16px; background: var(--card2); border-radius: 8px;
+    border-left: 3px solid;
+  }
+  .method-step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .method-icon { font-size: 22px; font-family: var(--mono); line-height: 1; }
+  .method-title { color: var(--text); font-weight: 700; font-size: 12px; }
+  .method-detail { color: var(--muted); font-size: 10px; line-height: 1.6; margin-bottom: 8px; }
+  .method-insight {
+    border-top: 1px solid var(--border); padding-top: 8px; color: var(--text); font-size: 10px; line-height: 1.5;
+  }
+
+  /* ── Limitation card ── */
+  .limit-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; cursor: pointer; transition: all .2s;
+  }
+  .limit-card.open { background: rgba(255,107,107,.05); border-color: var(--low); }
+  .limit-card-head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .limit-title { color: var(--text); font-weight: 700; font-size: 13px; }
+  .limit-desc { color: var(--muted); font-size: 11px; margin-top: 8px; line-height: 1.55; }
+  .limit-body { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: none; }
+  .limit-card.open .limit-body { display: block; }
+  .limit-workaround { margin-bottom: 10px; }
+  .limit-label { font-size: 9px; letter-spacing: .12em; margin-bottom: 4px; text-transform: uppercase; }
+  .limit-example { padding: 9px 12px; border-radius: 6px; border: 1px solid; margin-top: 6px; }
+
+  /* ── Case Study card ── */
+  .case-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; cursor: pointer; transition: all .2s; margin-bottom: 12px;
+  }
+  .case-card.open { border-color: var(--vhigh); background: rgba(0,245,212,.04); }
+  .case-head { display: flex; align-items: flex-start; gap: 12px; }
+  .case-icon { font-size: 26px; line-height: 1.1; }
+  .case-meta { flex: 1; }
+  .case-name { color: var(--text); font-weight: 700; font-size: 14px; }
+  .case-full { color: var(--muted); font-size: 10px; margin-top: 1px; }
+  .case-score { text-align: right; }
+  .case-plddt { font-weight: 900; font-size: 22px; font-family: var(--mono); }
+  .case-score-label { color: var(--muted); font-size: 9px; }
+  .case-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .case-body { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: none; }
+  .case-card.open .case-body { display: block; }
+  .case-section-label { color: var(--muted); font-size: 9px; letter-spacing: .14em; margin-bottom: 6px; text-transform: uppercase; }
+  .case-function { color: var(--text); font-size: 12px; line-height: 1.7; font-family: var(--serif); margin-bottom: 14px; }
+  .case-insight { display: flex; gap: 8px; margin-bottom: 7px; }
+  .case-insight-arrow { flex-shrink: 0; font-size: 14px; }
+  .case-insight-text { color: var(--text); font-size: 11px; line-height: 1.55; }
+  .case-drug { padding: 9px 12px; border-radius: 6px; border: 1px solid rgba(247,37,133,.35); background: rgba(247,37,133,.06); margin-top: 10px; }
+  .case-drug-label { color: var(--accent2); font-size: 9px; letter-spacing: .12em; font-weight: 700; text-transform: uppercase; }
+  .case-drug-text { color: var(--text); font-size: 11px; margin-top: 2px; }
+  .case-meta2 { color: var(--muted); font-size: 10px; margin-top: 6px; }
+
+  /* ── GO Term grid ── */
+  .go-item {
+    background: var(--card2); border-radius: 7px; padding: 11px 13px;
+  }
+  .go-item-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .go-term { color: var(--text); font-size: 11px; }
+  .go-added { color: var(--high); font-size: 10px; font-family: var(--mono); }
+  .go-track { background: var(--border); border-radius: 2px; height: 7px; position: relative; }
+  .go-template { position: absolute; height: 100%; border-radius: 2px; opacity: .65; background: var(--muted); }
+  .go-novel { position: absolute; height: 100%; border-radius: 2px; opacity: .85; background: var(--vhigh); }
+  .go-footer { display: flex; justify-content: space-between; margin-top: 3px; }
+  .go-num { font-size: 9px; }
+
+  /* ── SVG Charts ── */
+  svg text { font-family: var(--mono); }
+
+  /* ── pLDDT calibration ── */
+  .plddt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .plddt-label { color: var(--muted); font-size: 10px; width: 26px; flex-shrink: 0; }
+  .plddt-track { flex: 1; background: var(--border); border-radius: 2px; height: 7px; position: relative; }
+  .plddt-iqr { position: absolute; height: 100%; opacity: .35; background: var(--high); }
+  .plddt-dot { position: absolute; width: 4px; height: 100%; border-radius: 99px; background: var(--vhigh); }
+  .plddt-val { color: var(--vhigh); font-size: 10px; width: 22px; font-family: var(--mono); }
+
+  /* ── Drug step ── */
+  .drug-step { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
+  .drug-num {
+    width: 20px; height: 20px; border-radius: 50%; background: rgba(0,245,212,.12);
+    border: 1px solid rgba(0,245,212,.6); display: flex; align-items: center; justify-content: center;
+    color: var(--vhigh); font-size: 9px; font-weight: 700; flex-shrink: 0;
+  }
+
+  /* ── Tool item ── */
+  .tool-item { margin-bottom: 10px; padding: 9px 11px; background: var(--card2); border-radius: 6px; }
+  .tool-name { color: var(--accent); font-family: var(--mono); font-size: 11px; font-weight: 700; }
+  .tool-use { color: var(--muted); font-size: 10px; margin-top: 3px; }
+  .tool-result { color: var(--text); font-size: 10px; margin-top: 2px; }
+
+  /* ── Metric mini cards ── */
+  .mini-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mini-card { padding: 7px 10px; border-radius: 5px; border: 1px solid; }
+  .mini-val { font-weight: 700; font-family: var(--mono); }
+  .mini-label { font-size: 9px; margin-top: 2px; color: var(--muted); }
+
+  /* ── Prose section ── */
+  .prose { color: var(--muted); font-size: 11px; line-height: 1.75; }
+  .prose p { margin-bottom: 10px; }
+  .prose p:last-child { margin-bottom: 0; }
+
+  /* ── Step circle ── */
+  .step-circle {
+    width: 22px; height: 22px; border-radius: 50%; background: rgba(0,245,212,.2);
+    border: 1px solid rgba(0,245,212,.6); display: flex; align-items: center; justify-content: center;
+    color: var(--vhigh); font-size: 10px; font-weight: 700; flex-shrink: 0;
+  }
+  .step-row { display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; }
+  .step-title { color: var(--text); font-size: 12px; }
+  .step-tags { display: flex; gap: 6px; margin-top: 3px; flex-wrap: wrap; }
+
+  /* ── Footer ── */
+  footer {
+    padding: 12px 28px; border-top: 1px solid var(--border); color: var(--muted);
+    font-size: 9px; letter-spacing: .1em; display: flex; justify-content: space-between;
+    flex-wrap: wrap; gap: 4px;
+  }
+
+  /* ── Confidence gradient bar ── */
+  .conf-gradient {
+    height: 22px; border-radius: 4px; margin-bottom: 6px;
+    background: linear-gradient(to right, var(--low), var(--med), var(--high), var(--vhigh));
+  }
+  .conf-scale { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); }
+  .conf-labels { display: flex; justify-content: space-between; font-size: 9px; margin-top: 2px; }
+
+  /* ── Stat mini strip ── */
+  .stat-strip { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .stat-strip .mini { flex: 1; min-width: 80px; text-align: center; padding: 8px 6px; border-radius: 6px; border: 1px solid; }
+  .stat-strip .mini .v { font-weight: 700; font-size: 18px; font-family: var(--mono); }
+  .stat-strip .mini .l { font-size: 9px; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+
+  /* ── Disorder stacked ── */
+  .dis-row { margin-bottom: 16px; }
+  .dis-header { color: var(--text); font-size: 11px; margin-bottom: 5px; }
+  .dis-note { color: var(--muted); font-size: 9px; margin-top: 2px; }
+  .dis-nums { display: flex; gap: 12px; margin-top: 2px; }
+
+  /* Animations */
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  .panel.active { animation: fadeIn .25s ease; }
+
+  @keyframes countUp { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+<canvas id="mol-bg"></canvas>
+
+<div id="app">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-top">
+      <div class="header-title">
+        <div class="byline">AlphaFold · Nature 596 · Tunyasuvunakool et al. 2021</div>
+        <h1>Human Proteome <span>Structure Atlas</span></h1>
+        <div class="sub">20,296 proteins · 10.5M residues · 930 GPU-days</div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-val" data-target="98.5" data-suffix="%" style="color:var(--vhigh)">0%</div><div class="stat-label">Proteins Covered</div></div>
+        <div class="stat"><div class="stat-val" data-target="58" data-suffix="%" style="color:var(--high)">0%</div><div class="stat-label">Confident Residues</div></div>
+        <div class="stat"><div class="stat-val" data-target="35.7" data-suffix="%" style="color:var(--vhigh)">0%</div><div class="stat-label">Very High Conf.</div></div>
+        <div class="stat"><div class="stat-val" data-target="20296" data-suffix="" data-int="1" style="color:var(--accent)">0</div><div class="stat-label">Proteins Predicted</div></div>
+      </div>
+    </div>
+    <div class="tabs" id="tabs">
+      <button class="tab-btn active" data-tab="overview">Overview</button>
+      <button class="tab-btn" data-tab="accuracy">Accuracy</button>
+      <button class="tab-btn" data-tab="coverage">Coverage</button>
+      <button class="tab-btn" data-tab="disorder">Disorder</button>
+      <button class="tab-btn" data-tab="method">Method</button>
+      <button class="tab-btn" data-tab="seqlen">Seq Length</button>
+      <button class="tab-btn" data-tab="limitations">Limitations</button>
+      <button class="tab-btn" data-tab="proteins">Case Studies</button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- ══════════════ OVERVIEW ══════════════ -->
+    <div class="panel active" id="panel-overview">
+      <div class="grid grid-auto">
+
+        <div class="card">
+          <div class="card-title">pLDDT Confidence Bands — 10.5M Residues</div>
+          <div class="band"><div class="band-header"><span class="band-label">pLDDT 90–100</span><span class="band-pct" style="color:var(--vhigh)">35.7%</span></div><div class="band-bar"><div class="band-fill" style="width:35.7%;background:var(--vhigh)"></div></div><div class="band-desc">χ1 rotamers ~80% correct. Suitable for molecular replacement, drug pocket detection, crystallographic phasing.</div><div style="margin-top:3px"><span class="tag" style="color:var(--vhigh);border-color:rgba(0,245,212,.4);background:rgba(0,245,212,.1)">Drug discovery, structural biology</span></div></div>
+          <div class="band"><div class="band-header"><span class="band-label">pLDDT 70–90</span><span class="band-pct" style="color:var(--high)">22.3%</span></div><div class="band-bar"><div class="band-fill" style="width:22.3%;background:var(--high)"></div></div><div class="band-desc">Generally correct backbone. Good for homology-based function annotation, binding site mapping.</div><div style="margin-top:3px"><span class="tag" style="color:var(--high);border-color:rgba(58,134,255,.4);background:rgba(58,134,255,.1)">Function annotation, homology</span></div></div>
+          <div class="band"><div class="band-header"><span class="band-label">pLDDT 50–70</span><span class="band-pct" style="color:var(--med)">18.2%</span></div><div class="band-bar"><div class="band-fill" style="width:18.2%;background:var(--med)"></div></div><div class="band-desc">Use with caution. May indicate flexible loops, linkers, or marginally structured regions.</div><div style="margin-top:3px"><span class="tag" style="color:var(--med);border-color:rgba(255,183,3,.4);background:rgba(255,183,3,.1)">Treat as approximate only</span></div></div>
+          <div class="band"><div class="band-header"><span class="band-label">pLDDT 0–50</span><span class="band-pct" style="color:var(--low)">23.8%</span></div><div class="band-bar"><div class="band-fill" style="width:23.8%;background:var(--low)"></div></div><div class="band-desc">Ribbon-like appearance in PyMOL. Not a structure prediction — encodes predicted disorder, not 3D coordinates.</div><div style="margin-top:3px"><span class="tag" style="color:var(--low);border-color:rgba(255,107,107,.4);background:rgba(255,107,107,.1)">Interpret as disorder signal</span></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Coverage Milestones</div>
+          <div class="hbar"><div class="hbar-header"><span class="hbar-label">Proteins with any prediction</span><span class="hbar-val" style="color:var(--vhigh)">98.5%</span></div><div class="hbar-track"><div class="hbar-fill" style="width:98.5%;background:var(--vhigh)"></div></div></div>
+          <div class="hbar"><div class="hbar-header"><span class="hbar-label">Confident residues (pLDDT &gt;70)</span><span class="hbar-val" style="color:var(--high)">58.0%</span></div><div class="hbar-track"><div class="hbar-fill" style="width:58%;background:var(--high)"></div></div></div>
+          <div class="hbar"><div class="hbar-header"><span class="hbar-label">Very high confidence (pLDDT &gt;90)</span><span class="hbar-val" style="color:var(--vhigh)">35.7%</span></div><div class="hbar-track"><div class="hbar-fill" style="width:35.7%;background:var(--vhigh)"></div></div></div>
+          <div class="hbar"><div class="hbar-header"><span class="hbar-label">PDB experimental coverage pre-AlphaFold</span><span class="hbar-val" style="color:var(--low)">17.0%</span></div><div class="hbar-track"><div class="hbar-fill" style="width:17%;background:var(--low)"></div></div><div class="hbar-note">Only 35% of human proteins had any PDB entry at all</div></div>
+          <div class="hbar"><div class="hbar-header"><span class="hbar-label">Proteins ≥75% confident sequence</span><span class="hbar-val" style="color:var(--accent)">43.8%</span></div><div class="hbar-track"><div class="hbar-fill" style="width:43.8%;background:var(--accent)"></div></div></div>
+          <div class="callout" style="border-color:rgba(0,245,212,.3);background:rgba(0,245,212,.08)">AlphaFold doubled the structural coverage of the human proteome versus all experimental PDB entries combined.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Key Numbers at a Glance</div>
+          <div class="kv"><div><div class="kv-label">Total proteins predicted</div></div><span class="kv-val" style="color:var(--vhigh)">20,296</span></div>
+          <div class="kv"><div><div class="kv-label">Total residues predicted</div></div><span class="kv-val" style="color:var(--vhigh)">10,537,122</span></div>
+          <div class="kv"><div><div class="kv-label">Proteins with &gt;75% confident seq.</div></div><span class="kv-val" style="color:var(--high)">43.8%</span></div>
+          <div class="kv"><div><div class="kv-label">Novel fold proteins (no 30% id template)</div><div class="kv-sub">&gt;200 residues, pLDDT ≥70</div></div><span class="kv-val" style="color:var(--accent)">1,290</span></div>
+          <div class="kv"><div><div class="kv-label">Novel multi-domain chains (pTM &gt;0.8)</div></div><span class="kv-val" style="color:var(--accent2)">187</span></div>
+          <div class="kv"><div><div class="kv-label">Novel multi-domain chains (pTM &gt;0.7)</div></div><span class="kv-val" style="color:var(--accent2)">343</span></div>
+          <div class="kv"><div><div class="kv-label">pTM vs TM-score Pearson r</div></div><span class="kv-val" style="color:var(--green)">0.84</span></div>
+          <div class="kv"><div><div class="kv-label">pLDDT vs lDDT-Cα Pearson r</div><div class="kv-sub">Across 2.76M matched residues</div></div><span class="kv-val" style="color:var(--green)">0.73</span></div>
+          <div class="kv" style="border:none"><div><div class="kv-label">Chains excluded (&gt;2,700 aa)</div><div class="kv-sub">GPU memory constraint, not method limit</div></div><span class="kv-val" style="color:var(--muted)">~318</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">What the Confidence Bands Mean in Practice</div>
+          <div class="prose">
+            <p><strong style="color:var(--vhigh)">pLDDT ≥90 →</strong> Side-chain accuracy is high enough for molecular replacement in crystallographic phasing. Suitable for drug pocket detection, virtual screening, and fragment docking.</p>
+            <p><strong style="color:var(--high)">pLDDT 70–90 →</strong> Backbone reliable, side chains more variable. Good for structural bioinformatics, evolutionary analysis, and building homology models.</p>
+            <p><strong style="color:var(--med)">pLDDT 50–70 →</strong> Interpret with caution. Could be flexible linkers, partially folded regions, or areas that fold only upon binding a partner.</p>
+            <p><strong style="color:var(--low)">pLDDT &lt;50 →</strong> Treat as a <em>disorder signal</em>, not 3D coordinates. The ribbon-like helical appearance in PyMOL is an artefact of how AlphaFold encodes uncertainty in backbone angles, not a helix prediction.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════ ACCURACY ══════════════ -->
+    <div class="panel" id="panel-accuracy">
+      <div class="grid grid-auto">
+
+        <div class="card">
+          <div class="card-title">TM-Score Distribution — Long Multi-Domain Chains</div>
+          <div class="prose" style="margin-bottom:12px">Evaluated on 151 held-out PDB chains with &gt;800 resolved residues and best template &lt;30% identity.</div>
+          <svg id="tm-chart" viewBox="0 0 340 130" style="width:100%;overflow:visible"></svg>
+          <div class="stat-strip">
+            <div class="mini" style="background:rgba(0,245,212,.08);border-color:rgba(0,245,212,.3)"><div class="v" style="color:var(--vhigh)">70%</div><div class="l">chains with TM &gt;0.7</div></div>
+            <div class="mini" style="background:rgba(58,134,255,.08);border-color:rgba(58,134,255,.3)"><div class="v" style="color:var(--high)">151</div><div class="l">held-out evaluation chains</div></div>
+            <div class="mini" style="background:rgba(90,122,154,.08);border-color:rgba(90,122,154,.3)"><div class="v" style="color:var(--muted)">&lt;30%</div><div class="l">max template identity</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">CAMEO Benchmark: AlphaFold vs Best Single Template</div>
+          <div class="prose" style="margin-bottom:12px">428 targets from 1 year of CAMEO challenges. AlphaFold consistently outperforms the best available structural template across all sequence identity bins.</div>
+          <svg id="cameo-chart" viewBox="0 0 340 140" style="width:100%;overflow:visible"></svg>
+          <div class="callout" style="border-color:rgba(0,245,212,.3);background:rgba(0,245,212,.08)">Gap is largest at low identity (30–40%) where templates are most unreliable — exactly where structural biology has historically struggled.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">pLDDT ↔ lDDT-Cα Calibration</div>
+          <div class="prose" style="margin-bottom:10px">Pearson r = 0.73 across 2.76M matched residues. Linear fit: <code style="color:var(--vhigh)">lDDT = 0.967 × pLDDT + 1.9</code></div>
+          <div id="plddt-cal"></div>
+          <div style="color:var(--muted);font-size:9px;margin-top:6px">Bar = IQR (25–75th pct) · Dot = mean actual lDDT-Cα</div>
+          <div class="callout" style="border-color:rgba(58,134,255,.3);background:rgba(58,134,255,.08)">Calibration is near-perfect at high pLDDT (90–100). You can trust high-confidence predictions quantitatively.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Side-Chain Accuracy: χ₁ Rotamer Correctness</div>
+          <div class="prose" style="margin-bottom:10px">χ₁ correct within 40° of PDB value. Evaluated on 5,983 chains at &lt;2.5 Å resolution, B-factor &lt;30 Å².</div>
+          <svg id="rotamer-chart" viewBox="0 0 300 110" style="width:100%;overflow:visible"></svg>
+          <div class="mini-cards" style="margin-top:10px">
+            <div class="mini-card" style="background:rgba(0,245,212,.08);border-color:rgba(0,245,212,.3)"><div class="mini-val" style="color:var(--vhigh)">~80%</div><div class="mini-label">χ₁ correct at pLDDT &gt;90</div></div>
+            <div class="mini-card" style="background:rgba(58,134,255,.08);border-color:rgba(58,134,255,.3)"><div class="mini-val" style="color:var(--high)">~70%</div><div class="mini-label">χ₁ correct at pLDDT 70–90</div></div>
+            <div class="mini-card" style="background:rgba(255,183,3,.08);border-color:rgba(255,183,3,.3)"><div class="mini-val" style="color:var(--med)">~63%</div><div class="mini-label">χ₁ correct at pLDDT 50–70</div></div>
+            <div class="mini-card" style="background:rgba(255,107,107,.08);border-color:rgba(255,107,107,.3)"><div class="mini-val" style="color:var(--low)">~57%</div><div class="mini-label">χ₁ correct at pLDDT &lt;50</div></div>
+          </div>
+        </div>
+
+        <div class="card col-span">
+          <div class="card-title">Heterotypic Contacts → Accuracy Collapse</div>
+          <div class="grid grid-2" style="gap:20px;align-items:start">
+            <div>
+              <div class="prose" style="margin-bottom:12px">Evaluated on 3,007 chains with &lt;40% template identity. <em style="color:var(--text)">Heterotypic contact</em> = a cross-chain (non-homomeric) contact. When a domain only folds in complex, AlphaFold's single-chain prediction gets that region systematically wrong.</div>
+              <svg id="hetero-chart" viewBox="0 0 320 120" style="width:100%;overflow:visible"></svg>
+            </div>
+            <div>
+              <div style="padding:12px 14px;background:rgba(0,245,212,.06);border:1px solid rgba(0,245,212,.2);border-radius:8px;margin-bottom:10px"><div style="display:flex;justify-content:space-between"><span style="color:var(--text);font-size:12px;font-weight:700">Low heterotypic (&lt;25%)</span><span style="color:var(--vhigh);font-family:var(--mono);font-size:12px">~85 lDDT</span></div><div style="color:var(--muted);font-size:10px;margin-top:4px;line-height:1.4">Globular single-chain domains — AlphaFold excels</div></div>
+              <div style="padding:12px 14px;background:rgba(255,107,107,.06);border:1px solid rgba(255,107,107,.2);border-radius:8px;margin-bottom:10px"><div style="display:flex;justify-content:space-between"><span style="color:var(--text);font-size:12px;font-weight:700">High heterotypic (&gt;50%)</span><span style="color:var(--low);font-family:var(--mono);font-size:12px">~35 lDDT</span></div><div style="color:var(--muted);font-size:10px;margin-top:4px;line-height:1.4">Regions structured only in complex — systematically wrong</div></div>
+              <div style="padding:12px 14px;background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:8px;margin-bottom:10px"><div style="display:flex;justify-content:space-between"><span style="color:var(--text);font-size:12px;font-weight:700">Example: PDB 7KPX chain C</span><span style="color:var(--med);font-family:var(--mono);font-size:12px">Mixed</span></div><div style="color:var(--muted);font-size:10px;margin-top:4px;line-height:1.4">Globular domain: correct. Extended interface loop: completely mispredicted</div></div>
+              <div class="callout" style="border-color:rgba(255,183,3,.3);background:rgba(255,183,3,.06)">Low pLDDT at an interface does NOT always mean disorder — it may mean "structured only when bound." Interpreting these requires biological context.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════ COVERAGE ══════════════ -->
+    <div class="panel" id="panel-coverage">
+      <div class="grid grid-auto">
+
+        <div class="card col-span">
+          <div class="card-title">GO-Term Coverage: Novel vs Templated</div>
+          <div class="prose" style="margin-bottom:14px">Each bar shows residues with pLDDT &gt;70. The templated fraction (muted) existed before AlphaFold; the extension (bright) is newly added structural information.</div>
+          <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px" id="go-grid"></div>
+          <div class="callout" style="border-color:rgba(0,245,212,.3);background:rgba(0,245,212,.08)">Biggest gains in membrane categories (organelle membrane: +33%, plasma membrane: +32%) — exactly where experimental structures are hardest to obtain.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Confidence by Template Identity</div>
+          <div class="hbar"><div class="hbar-header"><span class="hbar-label">&gt;50% seq ID (safe template zone)</span><span class="hbar-val" style="color:var(--vhigh)">72%</span></div><div class="hbar-track"><div class="hbar-fill" style="width:72%;background:var(--vhigh)"></div></div></div>
+          <div class="hbar"><div class="hbar-header"><span class="hbar-label">30–50% seq ID (twilight zone)</span><span class="hbar-val" style="color:var(--high)">60%</span></div><div class="hbar-track"><div class="hbar-fill" style="width:60%;background:var(--high)"></div></div></div>
+          <div class="hbar"><div class="hbar-header"><span class="hbar-label">10–30% seq ID (dark zone)</span><span class="hbar-val" style="color:var(--med)">45%</span></div><div class="hbar-track"><div class="hbar-fill" style="width:45%;background:var(--med)"></div></div></div>
+          <div class="hbar"><div class="hbar-header"><span class="hbar-label">&lt;10% seq ID (no template)</span><span class="hbar-val" style="color:var(--low)">30%</span></div><div class="hbar-track"><div class="hbar-fill" style="width:30%;background:var(--low)"></div></div></div>
+          <div class="callout" style="border-color:rgba(255,183,3,.3);background:rgba(255,183,3,.06)">AlphaFold achieves ~30% confident coverage even for proteins with no detectable template — the "dark proteome." These are entirely new structural hypotheses.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Membrane Protein Coverage</div>
+          <div class="prose" style="margin-bottom:14px">Membrane proteins are severely underrepresented in the PDB — difficult to purify and crystallize. AlphaFold achieves substantial coverage despite sparse training examples.</div>
+          <div class="kv"><div class="kv-label">Plasma membrane proteins covered</div><span class="kv-val" style="color:var(--high)">52%</span></div>
+          <div class="kv"><div class="kv-label">Integral membrane components covered</div><span class="kv-val" style="color:var(--high)">50%</span></div>
+          <div class="kv"><div class="kv-label">Organelle membrane covered</div><span class="kv-val" style="color:var(--high)">55%</span></div>
+          <div class="kv"><div class="kv-label">Templated baseline (plasma membrane)</div><span class="kv-val" style="color:var(--muted)">~20%</span></div>
+          <div class="kv" style="border:none"><div class="kv-label">Net novel membrane coverage added</div><span class="kv-val" style="color:var(--vhigh)">~30–32%</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Historical Context: PDB vs AlphaFold</div>
+          <div class="prose">
+            <p>The Protein Data Bank (PDB) was founded in 1971. After 50 years of global experimental effort, it contained ~180,000 entries but with enormous redundancy — only ~17% of human proteome residues were covered.</p>
+            <p>A single AlphaFold run — 930 GPU-days — produced confident predictions for 58% of human residues and doubled the experimental baseline.</p>
+            <p>The AlphaFold Database (alphafold.ebi.ac.uk) has since expanded to cover &gt;200M proteins across all kingdoms of life.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════ DISORDER ══════════════ -->
+    <div class="panel" id="panel-disorder">
+      <div class="grid grid-auto">
+
+        <div class="card">
+          <div class="card-title">Disorder Prediction: CAID Benchmark</div>
+          <div class="prose" style="margin-bottom:14px">CAID DisProt-PDB dataset (178,124 residues). AUC of ROC for binary disorder/order classification.</div>
+          <div id="disorder-bars"></div>
+          <div class="callout" style="border-color:rgba(0,245,212,.3);background:rgba(0,245,212,.08)">pLDDT was never designed as a disorder predictor but surpasses all dedicated tools. The Experimentally Resolved Head achieves state-of-the-art AUC 0.921.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">pLDDT in Resolved vs Unresolved PDB Residues</div>
+          <div class="prose" style="margin-bottom:14px">The large shift in pLDDT distribution between PDB-resolved and PDB-unresolved residues validates pLDDT as a structural order proxy.</div>
+          <div class="dis-row">
+            <div class="dis-header">PDB resolved residues (n=3.44M)</div>
+            <div class="stacked-bar"><div style="flex:78;background:var(--vhigh);opacity:.85"></div><div style="flex:14;background:var(--med);opacity:.85"></div><div style="flex:8;background:var(--low);opacity:.65"></div></div>
+            <div class="dis-nums"><span style="color:var(--vhigh);font-size:9px">Conf. 78%</span><span style="color:var(--med);font-size:9px">Med. 14%</span><span style="color:var(--low);font-size:9px">Low 8%</span></div>
+            <div class="dis-note">78% above pLDDT 70 — confirms prediction accuracy</div>
+          </div>
+          <div class="dis-row">
+            <div class="dis-header">PDB unresolved residues (n=589K)</div>
+            <div class="stacked-bar"><div style="flex:28;background:var(--vhigh);opacity:.85"></div><div style="flex:32;background:var(--med);opacity:.85"></div><div style="flex:40;background:var(--low);opacity:.65"></div></div>
+            <div class="dis-nums"><span style="color:var(--vhigh);font-size:9px">Conf. 28%</span><span style="color:var(--med);font-size:9px">Med. 32%</span><span style="color:var(--low);font-size:9px">Low 40%</span></div>
+            <div class="dis-note">Only 28% above pLDDT 70 — correctly flagged as uncertain</div>
+          </div>
+          <div class="dis-row">
+            <div class="dis-header">Full human proteome (n=10.5M)</div>
+            <div class="stacked-bar"><div style="flex:36;background:var(--vhigh);opacity:.85"></div><div style="flex:22;background:var(--med);opacity:.85"></div><div style="flex:42;background:var(--low);opacity:.65"></div></div>
+            <div class="dis-nums"><span style="color:var(--vhigh);font-size:9px">Conf. 36%</span><span style="color:var(--med);font-size:9px">Med. 22%</span><span style="color:var(--low);font-size:9px">Low 42%</span></div>
+            <div class="dis-note">Estimated disorder fraction consistent with literature (37–50%)</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Why Does pLDDT Detect Disorder?</div>
+          <div class="prose">
+            <p>Disordered regions have shallow evolutionary conservation — many sequence positions tolerate substitutions without functional cost. This produces <em style="color:var(--text)">shallow, diverse MSAs</em> with weak covariation signal.</p>
+            <p>When the Evoformer receives a shallow MSA, it produces low-confidence pair representations. The pLDDT head, trained to predict accuracy, correctly outputs low confidence for these regions.</p>
+            <p>The Experimentally Resolved Head adds an explicit signal: it's trained on which residues appear in crystal structures vs which are missing (typically disordered loops). Its AUC 0.921 reflects this targeted training.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Interpreting Disordered Regions</div>
+          <div style="display:flex;gap:12px;margin-bottom:14px"><span style="color:var(--low);font-size:18px;flex-shrink:0;line-height:1.2">⚠</span><div><div style="color:var(--low);font-weight:700;font-size:12px;margin-bottom:3px">Do NOT model as structure</div><div style="color:var(--muted);font-size:11px;line-height:1.5">Ribbon-like helical appearance in PyMOL for pLDDT &lt;50 is an artefact. Do not perform structure-based analysis on these coordinates.</div></div></div>
+          <div style="display:flex;gap:12px;margin-bottom:14px"><span style="color:var(--green);font-size:18px;flex-shrink:0;line-height:1.2">✓</span><div><div style="color:var(--green);font-weight:700;font-size:12px;margin-bottom:3px">USE as disorder signal</div><div style="color:var(--muted);font-size:11px;line-height:1.5">pLDDT &lt;50 is a strong signal of genuine intrinsic disorder. Use it to annotate IDRs, predict linker regions, and flag regions for NMR vs crystallography.</div></div></div>
+          <div style="display:flex;gap:12px;margin-bottom:14px"><span style="color:var(--med);font-size:18px;flex-shrink:0;line-height:1.2">◈</span><div><div style="color:var(--med);font-weight:700;font-size:12px;margin-bottom:3px">Binding-induced folding</div><div style="color:var(--muted);font-size:11px;line-height:1.5">Low-confidence regions may fold upon binding a partner, ligand, or nucleic acid. Regulated disorder is often functionally important.</div></div></div>
+          <div style="display:flex;gap:12px"><span style="color:var(--accent);font-size:18px;flex-shrink:0;line-height:1.2">◇</span><div><div style="color:var(--accent);font-weight:700;font-size:12px;margin-bottom:3px">Post-translational control</div><div style="color:var(--muted);font-size:11px;line-height:1.5">Many IDRs are sites of phosphorylation, ubiquitylation, and modifications that control folding. AF prediction is of unmodified, unbound state.</div></div></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════ METHOD ══════════════ -->
+    <div class="panel" id="panel-method">
+      <div class="grid grid-auto">
+
+        <div class="card col-span">
+          <div class="card-title">AlphaFold2 Pipeline: 6 Key Stages</div>
+          <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">
+            <div class="method-step" style="border-color:var(--accent)"><div class="method-step-head"><span class="method-icon" style="color:var(--accent)">①</span><div><div class="method-title">Multiple Sequence Alignment (MSA)</div><div style="margin-top:3px"><span class="tag" style="color:var(--accent);border-color:rgba(199,125,255,.4);background:rgba(199,125,255,.1)">Input</span></div></div></div><div class="method-detail">Queries 3 databases in parallel: UniRef90 (jackhmmer), BFD-reduced (jackhmmer), MGnify (jackhmmer). Captures evolutionary covariation — residue pairs that co-evolve to stay in contact.</div><div class="method-insight"><span style="color:var(--accent)">KEY INSIGHT: </span>MSA depth is the single strongest predictor of AlphaFold accuracy. Orphan proteins with no homologues produce unreliable predictions.</div></div>
+            <div class="method-step" style="border-color:var(--accent)"><div class="method-step-head"><span class="method-icon" style="color:var(--accent)">②</span><div><div class="method-title">Template Search</div><div style="margin-top:3px"><span class="tag" style="color:var(--accent);border-color:rgba(199,125,255,.4);background:rgba(199,125,255,.1)">Input</span></div></div></div><div class="method-detail">Searches PDB70 via hmmsearch + HHSearch. Templates provide structural priors; up to 4 templates used with attention-based weighting. Templates not required — AlphaFold can predict without them.</div><div class="method-insight"><span style="color:var(--accent)">KEY INSIGHT: </span>Templates help most at low MSA depth. With deep MSA, they contribute marginally. AlphaFold can beat best template even with a template available.</div></div>
+            <div class="method-step" style="border-color:var(--vhigh)"><div class="method-step-head"><span class="method-icon" style="color:var(--vhigh)">③</span><div><div class="method-title">Evoformer (48 blocks)</div><div style="margin-top:3px"><span class="tag" style="color:var(--vhigh);border-color:rgba(0,245,212,.4);background:rgba(0,245,212,.1)">Core</span></div></div></div><div class="method-detail">The heart of AlphaFold2. Jointly reasons over the MSA (N_seq × N_res) and pair representation (N_res × N_res) with axial attention. Pair features encode inter-residue distance/orientation beliefs.</div><div class="method-insight"><span style="color:var(--vhigh)">KEY INSIGHT: </span>Row attention over MSA = each position attends to all others in that row. Column attention = each position in alignment column attends to others. This lets the model distinguish covariation from phylogenetic background.</div></div>
+            <div class="method-step" style="border-color:var(--vhigh)"><div class="method-step-head"><span class="method-icon" style="color:var(--vhigh)">④</span><div><div class="method-title">Structure Module (8 blocks)</div><div style="margin-top:3px"><span class="tag" style="color:var(--vhigh);border-color:rgba(0,245,212,.4);background:rgba(0,245,212,.1)">Core</span></div></div></div><div class="method-detail">Operates on single-residue frames (SE(3) equivariant). Each residue is a rigid body; the module predicts rotations and translations via Invariant Point Attention (IPA).</div><div class="method-insight"><span style="color:var(--vhigh)">KEY INSIGHT: </span>All torsion angles (backbone φ, ψ, ω; side-chain χ₁–χ₄) predicted simultaneously. Avoids sequential errors that plague fragment-assembly methods. Final structure is differentiable end-to-end.</div></div>
+            <div class="method-step" style="border-color:var(--high)"><div class="method-step-head"><span class="method-icon" style="color:var(--high)">⑤</span><div><div class="method-title">5 Models × Constrained Relaxation</div><div style="margin-top:3px"><span class="tag" style="color:var(--high);border-color:rgba(58,134,255,.4);background:rgba(58,134,255,.1)">Output</span></div></div></div><div class="method-detail">5 model checkpoints run per protein. Each relaxed with OpenMM/Amber99sb-ILDN to remove clashes. Best model selected by mean pLDDT over all residues.</div><div class="method-insight"><span style="color:var(--high)">KEY INSIGHT: </span>Relaxation does not significantly change global accuracy (lDDT unchanged) but removes stereochemical violations that cause downstream software issues.</div></div>
+            <div class="method-step" style="border-color:var(--high)"><div class="method-step-head"><span class="method-icon" style="color:var(--high)">⑥</span><div><div class="method-title">Confidence Outputs</div><div style="margin-top:3px"><span class="tag" style="color:var(--high);border-color:rgba(58,134,255,.4);background:rgba(58,134,255,.1)">Output</span></div></div></div><div class="method-detail">pLDDT: per-residue confidence (0–100). pTM: whole-chain global fold confidence (weighted by expected resolution). Experimentally Resolved Head: per-residue probability of appearing in crystal structure.</div><div class="method-insight"><span style="color:var(--high)">KEY INSIGHT: </span>Three complementary views: local accuracy (pLDDT), global packing (pTM), biological interpretability (resolved head). Use all three before drawing conclusions.</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Proteome-Scale Optimisations</div>
+          <div style="margin-bottom:12px;padding:11px 13px;background:var(--card2);border-radius:7px;border-left:3px solid var(--vhigh)"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--vhigh);font-weight:700;font-size:11px;font-family:var(--mono)">Reduced BFD search</span><span class="tag" style="color:var(--vhigh);border-color:rgba(0,245,212,.4);background:rgba(0,245,212,.1)">MSA Speed</span></div><div style="color:var(--muted);font-size:10px;line-height:1.5">Takes first non-consensus sequence per a3m alignment cluster. Captures diversity without full database traversal.</div></div>
+          <div style="margin-bottom:12px;padding:11px 13px;background:var(--card2);border-radius:7px;border-left:3px solid var(--vhigh)"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--vhigh);font-weight:700;font-size:11px;font-family:var(--mono)">Ensembling × 8 reduction</span><span class="tag" style="color:var(--vhigh);border-color:rgba(0,245,212,.4);background:rgba(0,245,212,.1)">Throughput</span></div><div style="color:var(--muted);font-size:10px;line-height:1.5">Standard AF2 runs inference 8× per model. Proteome run reduces this by 8× to prioritise throughput. Mild accuracy cost, large speedup.</div></div>
+          <div style="margin-bottom:12px;padding:11px 13px;background:var(--card2);border-radius:7px;border-left:3px solid var(--vhigh)"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--vhigh);font-weight:700;font-size:11px;font-family:var(--mono)">Multi-GPU scaling</span><span class="tag" style="color:var(--vhigh);border-color:rgba(0,245,212,.4);background:rgba(0,245,212,.1)">Scaling</span></div><div style="color:var(--muted);font-size:10px;line-height:1.5">Proteins 1,401–2,000 aa use 2 GPUs; 2,001–2,700 aa use 4 GPUs. Handles memory requirements for longer sequences.</div></div>
+          <div style="margin-bottom:12px;padding:11px 13px;background:var(--card2);border-radius:7px;border-left:3px solid var(--vhigh)"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--vhigh);font-weight:700;font-size:11px;font-family:var(--mono)">2,700 aa hard cutoff</span><span class="tag" style="color:var(--vhigh);border-color:rgba(0,245,212,.4);background:rgba(0,245,212,.1)">Scope</span></div><div style="color:var(--muted);font-size:10px;line-height:1.5">Not a fundamental method limit. Chosen for practical runtime and GPU memory constraints at proteome scale. Excludes ~318 human proteins.</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Databases & Compute</div>
+          <div style="margin-bottom:16px">
+            <div style="padding:9px 11px;background:var(--card2);border-radius:6px;margin-bottom:8px"><div style="display:flex;justify-content:space-between"><span style="color:var(--vhigh);font-family:var(--mono);font-size:12px;font-weight:700">UniRef90</span><div style="display:flex;gap:5px"><span class="tag" style="color:var(--accent);border-color:rgba(199,125,255,.4);background:rgba(199,125,255,.1)">jackhmmer</span></div></div><div style="color:var(--muted);font-size:10px;margin-top:3px">~150M sequences · Primary MSA — best characterised proteins</div></div>
+            <div style="padding:9px 11px;background:var(--card2);border-radius:6px;margin-bottom:8px"><div style="display:flex;justify-content:space-between"><span style="color:var(--vhigh);font-family:var(--mono);font-size:12px;font-weight:700">MGnify clusters</span><div style="display:flex;gap:5px"><span class="tag" style="color:var(--accent);border-color:rgba(199,125,255,.4);background:rgba(199,125,255,.1)">jackhmmer</span></div></div><div style="color:var(--muted);font-size:10px;margin-top:3px">Billions of sequences · Metagenomic MSA for rare proteins</div></div>
+            <div style="padding:9px 11px;background:var(--card2);border-radius:6px;margin-bottom:8px"><div style="display:flex;justify-content:space-between"><span style="color:var(--vhigh);font-family:var(--mono);font-size:12px;font-weight:700">PDB70</span><div style="display:flex;gap:5px"><span class="tag" style="color:var(--accent);border-color:rgba(199,125,255,.4);background:rgba(199,125,255,.1)">HHSearch</span></div></div><div style="color:var(--muted);font-size:10px;margin-top:3px">70% clustered · Template structure retrieval</div></div>
+          </div>
+          <div class="card-title" style="margin-bottom:10px">Compute Budget</div>
+          <div class="kv"><div class="kv-label">Total GPU-days (inference, 5 models)</div><span class="kv-val" style="color:var(--vhigh)">930 GPU-days</span></div>
+          <div class="kv"><div class="kv-label">CPU core-days (MSA + relax)</div><span class="kv-val" style="color:var(--high)">~510 CPU-days</span></div>
+          <div class="kv"><div class="kv-label">GPU hardware</div><span class="kv-val" style="color:var(--muted)">NVIDIA V100</span></div>
+          <div class="kv" style="border:none"><div class="kv-label">Equivalent wall time (single V100)</div><span class="kv-val" style="color:var(--accent2)">~2.5 years</span></div>
+          <div class="callout" style="border-color:rgba(199,125,255,.3);background:rgba(199,125,255,.06)">930 GPU-days compressed 50 years of structural biology into a single compute campaign. Each prediction costs ~$0.05–0.20 at cloud rates — cheaper than a PCR reaction.</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════ SEQ LENGTH ══════════════ -->
+    <div class="panel" id="panel-seqlen">
+      <div class="grid grid-auto">
+
+        <div class="card col-span">
+          <div class="card-title">Confidence Distribution by Sequence Length</div>
+          <div class="prose" style="margin-bottom:16px">Shorter proteins tend to have higher pLDDT — compact structures and deeper MSAs. Long proteins have more disordered linkers, multi-domain flexibility, and shallower per-region MSA depth.</div>
+          <div id="seqlen-bars"></div>
+          <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;background:var(--vhigh);border-radius:2px"></div><span style="color:var(--muted);font-size:9px">pLDDT &gt;90</span></div>
+            <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;background:var(--high);border-radius:2px"></div><span style="color:var(--muted);font-size:9px">70–90</span></div>
+            <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;background:var(--med);border-radius:2px"></div><span style="color:var(--muted);font-size:9px">50–70</span></div>
+            <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;background:var(--low);border-radius:2px"></div><span style="color:var(--muted);font-size:9px">&lt;50</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Why Longer Proteins Score Lower</div>
+          <div style="display:flex;gap:12px;margin-bottom:14px"><span style="color:var(--vhigh);font-size:20px;flex-shrink:0;line-height:1.2">⬡</span><div><div style="color:var(--text);font-weight:700;font-size:12px;margin-bottom:3px">More disordered linkers</div><div style="color:var(--muted);font-size:11px;line-height:1.5">Long proteins have more flexible inter-domain linkers, unstructured tails, and regulatory loops — all of which lower the average pLDDT.</div></div></div>
+          <div style="display:flex;gap:12px;margin-bottom:14px"><span style="color:var(--high);font-size:20px;flex-shrink:0;line-height:1.2">◈</span><div><div style="color:var(--text);font-weight:700;font-size:12px;margin-bottom:3px">Multi-domain flexibility</div><div style="color:var(--muted);font-size:11px;line-height:1.5">Domain-domain orientations are often variable in solution. AlphaFold predicts one conformation; pTM is the better metric for multi-domain accuracy.</div></div></div>
+          <div style="display:flex;gap:12px;margin-bottom:14px"><span style="color:var(--med);font-size:20px;flex-shrink:0;line-height:1.2">◇</span><div><div style="color:var(--text);font-weight:700;font-size:12px;margin-bottom:3px">MSA coverage dilution</div><div style="color:var(--muted);font-size:11px;line-height:1.5">Distant homologues may not cover all domains equally, leading to patchy confidence across a long chain.</div></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">The 2,700 aa Length Cap — Excluded Proteins</div>
+          <div class="prose" style="margin-bottom:12px">~318 human proteins excluded — practical not methodological limit.</div>
+          <div class="kv"><div><div class="kv-label" style="font-family:var(--mono)">Titin (TTN)</div><div class="kv-sub">Elastic filament in sarcomeres</div></div><span class="kv-val" style="color:var(--low)">34,350 aa</span></div>
+          <div class="kv"><div><div class="kv-label" style="font-family:var(--mono)">Mucin-16 (CA-125)</div><div class="kv-sub">Key cancer biomarker</div></div><span class="kv-val" style="color:var(--low)">~14,500 aa</span></div>
+          <div class="kv"><div><div class="kv-label" style="font-family:var(--mono)">Mucin-4 (MUC4)</div><div class="kv-sub">Heavily O-glycosylated</div></div><span class="kv-val" style="color:var(--low)">~7,500 aa</span></div>
+          <div class="kv"><div><div class="kv-label" style="font-family:var(--mono)">Obscurin (OBSCN)</div><div class="kv-sub">Sarcomeric scaffold; multiple Ig/Fn domains</div></div><span class="kv-val" style="color:var(--low)">~7,968 aa</span></div>
+          <div class="kv" style="border:none"><div><div class="kv-label" style="font-family:var(--mono)">AHNAK nucleoprotein</div><div class="kv-sub">Giant scaffold; repeat-containing</div></div><span class="kv-val" style="color:var(--low)">~5,900 aa</span></div>
+          <div class="callout" style="border-color:rgba(255,183,3,.3);background:rgba(255,183,3,.06)">AlphaFold3 and domain-splitting can now handle these — titin was predicted in segments in subsequent community efforts.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">pTM vs pLDDT vs Resolved Head: Which to Use?</div>
+          <div style="margin-bottom:12px;padding:12px 14px;background:rgba(0,245,212,.06);border:1px solid rgba(0,245,212,.2);border-radius:7px"><div style="color:var(--vhigh);font-weight:900;font-size:16px;font-family:var(--mono);margin-bottom:6px">pLDDT</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div style="color:var(--green);font-size:9px;letter-spacing:.1em;margin-bottom:3px;text-transform:uppercase">Use for</div><div style="color:var(--text);font-size:10px;line-height:1.4">Short proteins, single-domain proteins, residue-level analysis</div></div><div><div style="color:var(--low);font-size:9px;letter-spacing:.1em;margin-bottom:3px;text-transform:uppercase">Avoid for</div><div style="color:var(--muted);font-size:10px;line-height:1.4">Comparing across lengths; multi-domain packing</div></div></div></div>
+          <div style="margin-bottom:12px;padding:12px 14px;background:rgba(58,134,255,.06);border:1px solid rgba(58,134,255,.2);border-radius:7px"><div style="color:var(--high);font-weight:900;font-size:16px;font-family:var(--mono);margin-bottom:6px">pTM</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div style="color:var(--green);font-size:9px;letter-spacing:.1em;margin-bottom:3px;text-transform:uppercase">Use for</div><div style="color:var(--text);font-size:10px;line-height:1.4">Multi-domain proteins, chain-level filtering</div></div><div><div style="color:var(--low);font-size:9px;letter-spacing:.1em;margin-bottom:3px;text-transform:uppercase">Avoid for</div><div style="color:var(--muted);font-size:10px;line-height:1.4">Residue-level decisions; proteins with long disordered tails</div></div></div></div>
+          <div style="padding:12px 14px;background:rgba(199,125,255,.06);border:1px solid rgba(199,125,255,.2);border-radius:7px"><div style="color:var(--accent);font-weight:900;font-size:16px;font-family:var(--mono);margin-bottom:6px">Resolved Head</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div style="color:var(--green);font-size:9px;letter-spacing:.1em;margin-bottom:3px;text-transform:uppercase">Use for</div><div style="color:var(--text);font-size:10px;line-height:1.4">Disorder prediction, crystallography filtering</div></div><div><div style="color:var(--low);font-size:9px;letter-spacing:.1em;margin-bottom:3px;text-transform:uppercase">Avoid for</div><div style="color:var(--muted);font-size:10px;line-height:1.4">Measuring structural accuracy (measures different thing)</div></div></div></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════ LIMITATIONS ══════════════ -->
+    <div class="panel" id="panel-limitations">
+      <div class="prose" style="margin-bottom:20px;max-width:700px">AlphaFold2 is transformative but not omniscient. Understanding its failure modes is essential for correct scientific interpretation. Click any card to expand.</div>
+      <div class="grid grid-auto" id="limit-grid"></div>
+      <div class="card" style="margin-top:18px">
+        <div class="card-title">Broader Interpretive Cautions</div>
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px">
+          <div style="padding:12px 14px;background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:7px"><div style="display:flex;gap:8px;margin-bottom:6px"><span style="color:var(--med);font-size:18px;line-height:1">⚠</span><span style="color:var(--med);font-weight:700;font-size:12px">One structure ≠ all biology</span></div><div style="color:var(--muted);font-size:11px;line-height:1.55">A protein's function often depends on conformational changes, partner-induced folding, and context-dependent states. AlphaFold gives one static snapshot, not the full energy landscape.</div></div>
+          <div style="padding:12px 14px;background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:7px"><div style="display:flex;gap:8px;margin-bottom:6px"><span style="color:var(--med);font-size:18px;line-height:1">⚠</span><span style="color:var(--med);font-weight:700;font-size:12px">pLDDT ≠ B-factor</span></div><div style="color:var(--muted);font-size:11px;line-height:1.55">B-factors in crystal structures encode experimental thermal motion. pLDDT encodes predicted model accuracy. They correlate empirically but measure different things.</div></div>
+          <div style="padding:12px 14px;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);border-radius:7px"><div style="display:flex;gap:8px;margin-bottom:6px"><span style="color:var(--green);font-size:18px;line-height:1">✓</span><span style="color:var(--green);font-weight:700;font-size:12px">Hypotheses, not ground truth</span></div><div style="color:var(--muted);font-size:11px;line-height:1.55">AlphaFold predictions are strong structural hypotheses that should drive experimental design, not replace experimental validation for high-stakes applications.</div></div>
+          <div style="padding:12px 14px;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);border-radius:7px"><div style="display:flex;gap:8px;margin-bottom:6px"><span style="color:var(--green);font-size:18px;line-height:1">✓</span><span style="color:var(--green);font-weight:700;font-size:12px">Complement cryo-EM/X-ray</span></div><div style="color:var(--muted);font-size:11px;line-height:1.55">AlphaFold is most powerful when combined with low-resolution experimental data (cryo-EM maps, SAXS profiles, crosslinking mass spec) to guide and validate.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ CASE STUDIES ══════════════ -->
+    <div class="panel" id="panel-proteins">
+      <div class="grid grid-3-2" style="align-items:start">
+        <div>
+          <div class="prose" style="margin-bottom:16px">Three de novo case studies from the paper — no template with &gt;25% identity over &gt;20% of sequence. Click to expand structural insights.</div>
+          <div id="case-cards"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card">
+            <div class="card-title">Confidence Colour Scale (PDB/ChimeraX convention)</div>
+            <div class="conf-gradient"></div>
+            <div class="conf-scale"><span>0</span><span>50</span><span>70</span><span>90</span><span>100</span></div>
+            <div class="conf-labels"><span style="color:var(--low)">Disorder</span><span style="color:var(--med)">Caution</span><span style="color:var(--high)">Reliable</span><span style="color:var(--vhigh)">Accurate</span></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Structural Analysis Tools Used</div>
+            <div class="tool-item"><div class="tool-name">P2Rank v2.1</div><div class="tool-use">Ligand pocket detection on AlphaFold structures</div><div class="tool-result">→ Identified DGAT2 inhibitor binding site</div></div>
+            <div class="tool-item"><div class="tool-name">AutoDock Vina v1.1.2</div><div class="tool-use">Molecular docking (exhaust.=32, 25³ Å³ box)</div><div class="tool-result">→ Validated DGAT2 pocket specificity vs DGAT1</div></div>
+            <div class="tool-item"><div class="tool-name">PyMOL align</div><div class="tool-use">r.m.s.d. with outlier rejection (5 cycles)</div><div class="tool-result">→ G6Pase active site: 0.56 Å vs 1IDQ (49/51 atoms)</div></div>
+            <div class="tool-item"><div class="tool-name">TM-align</div><div class="tool-use">Global structure comparison</div><div class="tool-result">→ Wolframin OB-fold: TM-score 0.472 vs best PDB hit</div></div>
+            <div class="tool-item" style="margin-bottom:0"><div class="tool-name">HHSearch / HH-suite v3</div><div class="tool-use">Template detection (PDB70)</div><div class="tool-result">→ All three cases: found only distant or no templates</div></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Drug Discovery Workflow (DGAT2)</div>
+            <div class="prose" style="margin-bottom:10px">A complete computational drug discovery pipeline on an AlphaFold model:</div>
+            <div class="drug-step"><div class="drug-num">1</div><span style="color:var(--text);font-size:11px">Pocket prediction (P2Rank)</span></div>
+            <div class="drug-step"><div class="drug-num">2</div><span style="color:var(--text);font-size:11px">Inhibitor preparation (MGLTools)</span></div>
+            <div class="drug-step"><div class="drug-num">3</div><span style="color:var(--text);font-size:11px">Docking & pose scoring (Vina)</span></div>
+            <div class="drug-step"><div class="drug-num">4</div><span style="color:var(--text);font-size:11px">Selectivity test vs related enzyme</span></div>
+            <div class="drug-step"><div class="drug-num">5</div><span style="color:var(--text);font-size:11px">Mutagenesis predictions (His163 &gt; adjacent His)</span></div>
+            <div class="drug-step"><div class="drug-num">6</div><span style="color:var(--text);font-size:11px">Experimental validation of predictions</span></div>
+            <div class="callout" style="border-color:rgba(247,37,133,.3);background:rgba(247,37,133,.06)">This pipeline identified actionable drug targets for NASH — a disease affecting 25% of adults globally with no approved therapy at the time.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <span>TUNYASUVUNAKOOL ET AL. · NATURE 596, 590–596 (2021) · DOI:10.1038/s41586-021-03828-1</span>
+    <span>CC-BY-4.0 · ALPHAFOLD.EBI.AC.UK · DATABASE: 200M+ PROTEINS</span>
+  </footer>
+</div>
+
+<script>
+// ─── Molecular BG Canvas ───────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('mol-bg');
+  const ctx = canvas.getContext('2d');
+  function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; draw(); }
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const nodes = Array.from({length:40}, (_,i) => ({
+      x: (canvas.width * 0.04) + (i % 8) * (canvas.width * 0.13) + (Math.floor(i/8) % 2) * (canvas.width * 0.065),
+      y: (canvas.height * 0.05) + Math.floor(i/8) * (canvas.height * 0.24),
+    }));
+    ctx.strokeStyle = '#00f5d4'; ctx.lineWidth = 0.5;
+    nodes.forEach((a,i) => nodes.slice(i+1).forEach(b => {
+      const d = Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2);
+      if (d < Math.min(canvas.width,canvas.height)*0.15) {
+        ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+      }
+    }));
+    ctx.fillStyle = '#00f5d4';
+    nodes.forEach(n => { ctx.beginPath(); ctx.arc(n.x,n.y,2,0,Math.PI*2); ctx.fill(); });
+  }
+  window.addEventListener('resize', resize); resize();
+})();
+
+// ─── Animated Counters ─────────────────────────────────────────
+document.querySelectorAll('[data-target]').forEach(el => {
+  const target = parseFloat(el.dataset.target);
+  const suffix = el.dataset.suffix || '';
+  const isInt = el.dataset.int === '1';
+  let start = null;
+  const step = ts => {
+    if (!start) start = ts;
+    const p = Math.min((ts - start) / 1200, 1);
+    const e = 1 - Math.pow(1-p, 3);
+    const v = target * e;
+    el.textContent = (isInt ? Math.floor(v).toLocaleString() : v.toFixed(1)) + suffix;
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+});
+
+// ─── Tab Switching ─────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ─── Data ──────────────────────────────────────────────────────
+const tmData = [{bin:"0.1–0.2",pct:2},{bin:"0.2–0.3",pct:3},{bin:"0.3–0.4",pct:5},{bin:"0.4–0.5",pct:8},{bin:"0.5–0.6",pct:12},{bin:"0.6–0.7",pct:10},{bin:"0.7–0.8",pct:20},{bin:"0.8–0.9",pct:28},{bin:"0.9+",pct:12}];
+const cameoData = [{r:"30–40%",af:91,best:80},{r:"40–50%",af:93,best:83},{r:"50–60%",af:91,best:85},{r:"60–70%",af:94,best:88},{r:"70–80%",af:95,best:90},{r:"80–90%",af:96,best:93}];
+const plddtCal = [{p:20,m:22,q1:14,q3:32},{p:30,m:30,q1:18,q3:43},{p:40,m:40,q1:26,q3:55},{p:50,m:50,q1:36,q3:65},{p:60,m:60,q1:46,q3:74},{p:70,m:70,q1:57,q3:82},{p:80,m:80,q1:71,q3:88},{p:90,m:90,q1:84,q3:95},{p:95,m:95,q1:91,q3:98}];
+const rotData = [{p:20,v:55},{p:30,v:57},{p:40,v:59},{p:50,v:62},{p:60,v:65},{p:70,v:70},{p:75,v:74},{p:80,v:77},{p:85,v:80},{p:90,v:84},{p:95,v:90},{p:100,v:97}];
+const heteroData = [{bin:"0–10%",l:88},{bin:"10–20%",l:80},{bin:"20–30%",l:68},{bin:"30–40%",l:55},{bin:"40–50%",l:44},{bin:"50–60%",l:37},{bin:"60–70%",l:32},{bin:">70%",l:28}];
+const goTerms = [{t:"Catalytic activity",c:.64,p:.38},{t:"Protein binding",c:.60,p:.35},{t:"Metal ion binding",c:.57,p:.33},{t:"Nucleic acid binding",c:.48,p:.28},{t:"Vesicle",c:.54,p:.30},{t:"Organelle membrane",c:.55,p:.22},{t:"Integral membrane",c:.50,p:.18},{t:"Plasma membrane",c:.52,p:.20},{t:"Protein complex",c:.58,p:.29},{t:"Cytosol",c:.63,p:.36},{t:"Nucleoplasm",c:.58,p:.30},{t:"Nucleus",c:.60,p:.31}];
+const disorderBars = [{n:"AlphaFold — Exp. Resolved Head",a:.921,c:"#00f5d4",note:"Explicitly trained to predict crystallographic resolution"},{n:"AlphaFold — pLDDT (off-label)",a:.897,c:"#3a86ff",note:"Designed as confidence metric, not disorder predictor"},{n:"SPOT-Disorder2 (SOTA 2021)",a:.880,c:"#ffb703",note:"Best dedicated disorder predictor at time of publication"},{n:"MobiDB-lite",a:.840,c:"#5a7a9a",note:"Consensus-based lightweight predictor"}];
+const seqLenBins = [{l:"1–100 aa",vh:42,h:26,m:14,lo:18,n:1820},{l:"100–200 aa",vh:39,h:24,m:17,lo:20,n:3940},{l:"200–400 aa",vh:37,h:22,m:18,lo:23,n:5210},{l:"400–700 aa",vh:35,h:21,m:19,lo:25,n:4780},{l:"700–1000 aa",vh:33,h:20,m:20,lo:27,n:2240},{l:"1000–1500 aa",vh:30,h:19,m:21,lo:30,n:1400},{l:"1500–2700 aa",vh:27,h:18,m:21,lo:34,n:906}];
+const limitData = [
+  {t:"Complexes / Interfaces",sev:"high",d:"AlphaFold predicts single chains in isolation. Chains with >25% heterotypic contacts show median lDDT ~52 vs ~85 for globular chains.",w:"AlphaFold-Multimer (2021) addresses this; for monomers, flag high-heterotypic predictions manually.",e:"PDB 7KPX chain C: globular domain correct, extended interface loop completely wrong."},
+  {t:"Very Long Chains (>2,700 aa)",sev:"high",d:"Excluded from this proteome run. Not a fundamental method limit — GPU memory and runtime at proteome scale made this impractical.",w:"Cropping into domains with uncertainty-guided splitting; or run later with more memory.",e:"318 human proteins excluded: titin (34,350 aa), connectin, mucins."},
+  {t:"Orphan / Dark Proteins",sev:"high",d:"Proteins with few homologues produce shallow MSAs. Evoformer gets little covariation signal — accuracy degrades sharply.",w:"Use metagenomic databases (MGnify) for more signal. Consider experimental validation.",e:"Human ORFan genes — ~20% of human proteome has no detectable homolog in at least one database."},
+  {t:"Conformational Flexibility",sev:"medium",d:"One structure predicted, one conformation output. Proteins with large-scale domain motions give only one state.",w:"Generate ensemble predictions by masking MSA columns. AlphaFold3 partially addresses with diffusion sampling.",e:"Adenylate kinase 'open' vs 'closed' — a single deterministic output misses the functional cycle."},
+  {t:"Post-Translational Modifications",sev:"medium",d:"Phosphorylation, glycosylation, ubiquitylation, etc. are ignored. Modifications can induce large structural changes.",w:"Currently no clean solution. Homologous modified structures in PDB can be used as references.",e:"Intrinsically disordered activation loops fold upon phosphorylation — AF gives only unphosphorylated form."},
+  {t:"Membrane Protein Lipid Context",sev:"medium",d:"Predicted in aqueous context. Lipid bilayer may constrain or stabilize different conformations.",w:"Use CHARMM-GUI or CG-MD simulations to place predictions in realistic membrane environments.",e:"GPCRs: intracellular loops known to adopt different conformations depending on lipid composition."},
+  {t:"Homo- and Heteromultimers",sev:"low",d:"Homomeric interfaces can sometimes be inferred from single-chain predictions, but not always.",w:"AlphaFold-Multimer, symmetry-aware docking, or experimental cryo-EM density fitting.",e:"Designed homomers (symmetric): usually fine. Asymmetric homomers: may get conformation only in complex."},
+  {t:"Template Contamination Risk",sev:"low",d:"If training data includes structures similar to test proteins, accuracy may be inflated on benchmarks.",w:"CAMEO benchmark uses proteins deposited after training cutoff — mitigates this concern.",e:"Paper uses Feb 2021 PDB cutoff; CAMEO test set is continuously updated post-training."},
+];
+const caseData = [
+  {id:"g6pase",name:"G6Pase-α",full:"Glucose-6-Phosphatase α",uni:"P35575",plddt:95.5,aplddt:96.6,type:"Membrane Enzyme",icon:"⬡",col:"#00f5d4",
+   fn:"Catalyses the final step in gluconeogenesis and glycogenolysis — dephosphorylation of glucose-6-phosphate to glucose. Critical for blood sugar homeostasis.",
+   topo:"9-helix transmembrane topology (ER membrane)",novel:"No prior experimental structure. Most similar PDB entry has <25% identity.",
+   ins:["Active site tunnel opens to ER lumen surface — substrate must enter from lumenal side","Active site aligns with chloroperoxidase (PDB 1IDQ) at 0.56 Å r.m.s.d. across 49/51 atoms","Conserved histidine–aspartate catalytic dyad confirmed by structural alignment","Novel residue Glu110: conserved in G6Pase-β but absent in chloroperoxidase","Glu110 is most solvent-exposed residue near active site — proposed gating function","Salt bridges with positively charged residues could stabilize closed gating conformation"],
+   drug:"Glycogen storage disease type Ia (von Gierke disease) — loss-of-function mutations cause severe hypoglycaemia"},
+  {id:"dgat2",name:"DGAT2",full:"Diacylglycerol O-Acyltransferase 2",uni:"Q96PD7",plddt:95.9,aplddt:93.7,type:"Acyltransferase",icon:"◈",col:"#00f5d4",
+   fn:"Catalyses the final step in triacylglycerol synthesis (fat storage). Key enzyme for neutral lipid metabolism in liver, adipose tissue, and intestine.",
+   topo:"Membrane-anchored (ER membrane via N-terminal hairpin)",novel:"No experimental structure at time of prediction. Distantly related to DGAT1 (different fold family).",
+   ins:["P2Rank identified binding pocket for DGAT2-specific inhibitor PF-06424439","AutoDock Vina: DGAT2-specific inhibitor fits pocket — DGAT1 inhibitor does not (selectivity confirmed)","His163 & Glu243 analogous to catalytic His415/Glu416 in DGAT1 — conserved geometry despite different fold","Ser244 adjacent to Glu243 — may form acyl-enzyme intermediate via serine mechanism","Mutagenesis: mutating His163 has stronger deleterious effect than adjacent His (model-predicted, experiment confirmed)","His163 and Glu243 conserved across metazoa — strong evolutionary constraint on catalytic geometry"],
+   drug:"NASH (nonalcoholic steatohepatitis) — DGAT2 inhibitors in Phase 2 clinical trials for fatty liver disease"},
+  {id:"wolframin",name:"Wolframin",full:"Wolframin (WFS1)",uni:"O76024",plddt:81.7,aplddt:86.0,type:"ER Membrane Protein",icon:"◇",col:"#3a86ff",
+   fn:"ER-localised transmembrane protein; mutations cause Wolfram syndrome 1 (progressive neurodegeneration, diabetes mellitus, optic atrophy, deafness).",
+   topo:"ER transmembrane (9 predicted TM helices) with large lumenal C-terminal domain",novel:"Most similar PDB chain (3F1Z) has TM-score only 0.472 — genuinely novel fold with no structural precedent",
+   ins:["OB-fold domain identified in C-terminal region — consistent with evolutionary analysis but previously undetected","Unique cysteine-rich insertion incorporated as characteristic β1 strand of OB-fold","Extended L12 loop with 2 predicted disulfide bridges — confirmed fold novelty in ER oxidizing environment","Third predicted disulfide bridge in cysteine-rich region — all three would stabilize structure in ER lumen","Cysteine-rich region hypothesized to recruit partner proteins or act as redox sensor","Structural model enables targeted mutagenesis for Wolfram syndrome therapeutic development"],
+   drug:"Wolfram syndrome 1 — rare neurodegenerative disease with no approved therapy; model enables targeted drug design"},
+];
+
+// ─── SVG Builders ──────────────────────────────────────────────
+function svgEl(tag, attrs={}, text='') {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k,v));
+  if (text) el.textContent = text;
+  return el;
+}
+
+// TM Score chart
+(function(){
+  const svg = document.getElementById('tm-chart');
+  const w=340,h=130,pad={l:30,r:12,t:14,b:30};
+  const iw=w-pad.l-pad.r,ih=h-pad.t-pad.b;
+  const max=Math.max(...tmData.map(d=>d.pct));
+  const bw=iw/tmData.length-4;
+  [0,.5,1].forEach(f=>{const l=svgEl('line',{x1:pad.l,x2:w-pad.r,y1:pad.t+ih*(1-f),y2:pad.t+ih*(1-f),stroke:'#1a2d4a','stroke-width':.5,'stroke-dasharray':'3,3'}); svg.appendChild(l);});
+  const tl=svgEl('line',{x1:pad.l+iw*.67,x2:pad.l+iw*.67,y1:pad.t,y2:pad.t+ih,stroke:'#00f5d4','stroke-width':1,'stroke-dasharray':'4,3',opacity:.55}); svg.appendChild(tl);
+  const tt=svgEl('text',{x:pad.l+iw*.67+3,y:pad.t+10,fill:'#00f5d4','font-size':7.5},'TM≥0.7 threshold'); svg.appendChild(tt);
+  tmData.forEach((d,i)=>{
+    const x=pad.l+i*(iw/tmData.length)+2;
+    const bh=(d.pct/max)*ih;
+    const rect=svgEl('rect',{x,y:pad.t+ih-bh,width:bw,height:bh,fill:i>=6?'#00f5d4':'#3a86ff',opacity:i>=6?.85:.35,rx:2}); svg.appendChild(rect);
+    const tx=svgEl('text',{x:x+bw/2,y:h-4,'text-anchor':'middle',fill:'#5a7a9a','font-size':7}); tx.textContent=d.bin; svg.appendChild(tx);
+    const tv=svgEl('text',{x:x+bw/2,y:pad.t+ih-bh-3,'text-anchor':'middle',fill:i>=6?'#00f5d4':'#5a7a9a','font-size':7}); tv.textContent=d.pct+'%'; svg.appendChild(tv);
+  });
+  const lx=svgEl('text',{x:w/2,y:h,'text-anchor':'middle',fill:'#5a7a9a','font-size':8},'TM-Score bin'); svg.appendChild(lx);
+})();
+
+// CAMEO chart
+(function(){
+  const svg = document.getElementById('cameo-chart');
+  const w=340,h=140,pad={l:36,r:12,t:16,b:34};
+  const iw=w-pad.l-pad.r,ih=h-pad.t-pad.b;
+  const yMin=75,yMax=100;
+  const sy=v=>pad.t+ih*(1-(v-yMin)/(yMax-yMin));
+  const sx=i=>pad.l+(i/(cameoData.length-1))*iw;
+  [75,80,85,90,95,100].forEach(v=>{
+    const l=svgEl('line',{x1:pad.l,x2:w-pad.r,y1:sy(v),y2:sy(v),stroke:'#1a2d4a','stroke-width':.5}); svg.appendChild(l);
+    const t=svgEl('text',{x:pad.l-4,y:sy(v)+3,'text-anchor':'end',fill:'#5a7a9a','font-size':7}); t.textContent=v; svg.appendChild(t);
+  });
+  cameoData.forEach((d,i)=>{const t=svgEl('text',{x:sx(i),y:h-4,'text-anchor':'middle',fill:'#5a7a9a','font-size':7.5}); t.textContent=d.r; svg.appendChild(t);});
+  const afArea='M'+cameoData.map((d,i)=>sx(i)+','+sy(d.af)).join('L')+'L'+sx(cameoData.length-1)+','+(pad.t+ih)+'L'+sx(0)+','+(pad.t+ih)+'Z';
+  const areaEl=svgEl('path',{d:afArea,fill:'rgba(0,245,212,0.1)',stroke:'none'}); svg.appendChild(areaEl);
+  const bstPts=cameoData.map((d,i)=>sx(i)+','+sy(d.best)).join(' ');
+  const afPts=cameoData.map((d,i)=>sx(i)+','+sy(d.af)).join(' ');
+  const bl=svgEl('polyline',{points:bstPts,fill:'none',stroke:'#ffb703','stroke-width':1.5,'stroke-dasharray':'5,3',opacity:.75}); svg.appendChild(bl);
+  const al=svgEl('polyline',{points:afPts,fill:'none',stroke:'#00f5d4','stroke-width':2.2}); svg.appendChild(al);
+  cameoData.forEach((d,i)=>{
+    svg.appendChild(svgEl('circle',{cx:sx(i),cy:sy(d.af),r:3,fill:'#00f5d4'}));
+    svg.appendChild(svgEl('circle',{cx:sx(i),cy:sy(d.best),r:2.5,fill:'#ffb703',opacity:.85}));
+  });
+  const t1=svgEl('text',{x:w-pad.r-2,y:sy(cameoData.at(-1).af)-5,fill:'#00f5d4','font-size':8,'text-anchor':'end'},'AlphaFold2'); svg.appendChild(t1);
+  const t2=svgEl('text',{x:w-pad.r-2,y:sy(cameoData.at(-1).best)+12,fill:'#ffb703','font-size':8,'text-anchor':'end'},'Best template'); svg.appendChild(t2);
+  const lx=svgEl('text',{x:w/2,y:h,'text-anchor':'middle',fill:'#5a7a9a','font-size':8},'Template sequence identity'); svg.appendChild(lx);
+  const ly=svgEl('text',{x:0,y:h/2+4,'text-anchor':'middle',fill:'#5a7a9a','font-size':8,transform:`rotate(-90 10 ${h/2})`},'lDDT-Cα (median)'); svg.appendChild(ly);
+})();
+
+// Rotamer chart
+(function(){
+  const svg = document.getElementById('rotamer-chart');
+  const w=300,h=110,pad={l:28,r:12,t:12,b:28};
+  const iw=w-pad.l-pad.r,ih=h-pad.t-pad.b;
+  const sx=v=>pad.l+((v-20)/80)*iw;
+  const sy=v=>pad.t+ih*(1-(v-50)/50);
+  const pts=rotData.map(d=>sx(d.p)+','+sy(d.v)).join(' ');
+  const area='M'+sx(20)+','+(pad.t+ih)+' '+rotData.map(d=>sx(d.p)+','+sy(d.v)).join(' ')+' '+sx(100)+','+(pad.t+ih);
+  [60,70,80,90,100].forEach(v=>{
+    const l=svgEl('line',{x1:pad.l,x2:w-pad.r,y1:sy(v),y2:sy(v),stroke:'#1a2d4a','stroke-width':.5}); svg.appendChild(l);
+    const t=svgEl('text',{x:pad.l-3,y:sy(v)+3,'text-anchor':'end',fill:'#5a7a9a','font-size':7}); t.textContent=v+'%'; svg.appendChild(t);
+  });
+  svg.appendChild(svgEl('line',{x1:sx(90),x2:sx(90),y1:pad.t,y2:pad.t+ih,stroke:'#00f5d4','stroke-width':1,'stroke-dasharray':'3,3',opacity:.5}));
+  const tt=svgEl('text',{x:sx(91),y:pad.t+9,fill:'#00f5d4','font-size':7},'pLDDT 90 → ~80% χ₁'); svg.appendChild(tt);
+  svg.appendChild(svgEl('polygon',{points:area,fill:'rgba(58,134,255,0.15)'}));
+  svg.appendChild(svgEl('polyline',{points:pts,fill:'none',stroke:'#3a86ff','stroke-width':2}));
+  [20,40,60,70,80,90,100].forEach(v=>{const t=svgEl('text',{x:sx(v),y:h-4,'text-anchor':'middle',fill:'#5a7a9a','font-size':7}); t.textContent=v; svg.appendChild(t);});
+  const lx=svgEl('text',{x:w/2,y:h,'text-anchor':'middle',fill:'#5a7a9a','font-size':8},'pLDDT'); svg.appendChild(lx);
+})();
+
+// Heterotypic chart
+(function(){
+  const svg = document.getElementById('hetero-chart');
+  const w=320,h=120,pad={l:30,r:12,t:14,b:30};
+  const iw=w-pad.l-pad.r,ih=h-pad.t-pad.b;
+  const bw=iw/heteroData.length-4;
+  const sy=v=>pad.t+ih*(1-(v-20)/80);
+  [30,50,70,90].forEach(v=>{
+    const l=svgEl('line',{x1:pad.l,x2:w-pad.r,y1:sy(v),y2:sy(v),stroke:'#1a2d4a','stroke-width':.5,'stroke-dasharray':'3,3'}); svg.appendChild(l);
+    const t=svgEl('text',{x:pad.l-3,y:sy(v)+3,'text-anchor':'end',fill:'#5a7a9a','font-size':7}); t.textContent=v; svg.appendChild(t);
+  });
+  svg.appendChild(svgEl('line',{x1:pad.l,x2:w-pad.r,y1:sy(70),y2:sy(70),stroke:'#00f5d4','stroke-width':1,'stroke-dasharray':'4,3',opacity:.5}));
+  heteroData.forEach((d,i)=>{
+    const x=pad.l+i*(iw/heteroData.length)+2;
+    const frac=i/(heteroData.length-1);
+    const col=frac<.3?'#00f5d4':frac<.6?'#ffb703':'#ff6b6b';
+    const bh=(d.l-20)/80*ih;
+    svg.appendChild(svgEl('rect',{x,y:sy(d.l),width:bw,height:bh,fill:col,opacity:.75,rx:2}));
+    const tx=svgEl('text',{x:x+bw/2,y:h-4,'text-anchor':'middle',fill:'#5a7a9a','font-size':6.5}); tx.textContent=d.bin; svg.appendChild(tx);
+    const tv=svgEl('text',{x:x+bw/2,y:sy(d.l)-3,'text-anchor':'middle',fill:col,'font-size':7}); tv.textContent=d.l; svg.appendChild(tv);
+  });
+  const lx=svgEl('text',{x:w/2,y:h,'text-anchor':'middle',fill:'#5a7a9a','font-size':8},'% heterotypic contacts'); svg.appendChild(lx);
+  const ly=svgEl('text',{x:0,y:h/2+4,'text-anchor':'middle',fill:'#5a7a9a','font-size':8,transform:`rotate(-90 10 ${h/2})`},'lDDT-Cα'); svg.appendChild(ly);
+})();
+
+// pLDDT calibration rows
+(function(){
+  const container = document.getElementById('plddt-cal');
+  plddtCal.forEach(d=>{
+    container.innerHTML += `<div class="plddt-row">
+      <span class="plddt-label">${d.p}</span>
+      <div class="plddt-track">
+        <div class="plddt-iqr" style="left:${d.q1}%;right:${100-d.q3}%"></div>
+        <div class="plddt-dot" style="left:${d.m-2}%"></div>
+      </div>
+      <span class="plddt-val">${d.m}</span>
+    </div>`;
+  });
+})();
+
+// GO terms
+(function(){
+  const grid = document.getElementById('go-grid');
+  goTerms.forEach(g=>{
+    const added = g.c-g.p;
+    grid.innerHTML += `<div class="go-item">
+      <div class="go-item-header"><span class="go-term">${g.t}</span><span class="go-added">+${Math.round(added*100)}%</span></div>
+      <div class="go-track">
+        <div class="go-template" style="width:${g.p*100}%"></div>
+        <div class="go-novel" style="left:${g.p*100}%;width:${added*100}%"></div>
+      </div>
+      <div class="go-footer"><span class="go-num" style="color:var(--muted)">templated: ${Math.round(g.p*100)}%</span><span class="go-num" style="color:var(--vhigh)">total: ${Math.round(g.c*100)}%</span></div>
+    </div>`;
+  });
+})();
+
+// Disorder bars
+(function(){
+  const container = document.getElementById('disorder-bars');
+  disorderBars.forEach(d=>{
+    container.innerHTML += `<div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="color:var(--text);font-size:11px">${d.n}</span>
+        <span style="color:${d.c};font-weight:700;font-family:var(--mono)">AUC ${d.a}</span>
+      </div>
+      <div style="background:var(--border);border-radius:3px;height:9px">
+        <div style="background:${d.c};width:${d.a*100}%;height:100%;border-radius:3px;opacity:.85"></div>
+      </div>
+      <div style="color:var(--muted);font-size:9px;margin-top:3px">${d.note}</div>
+    </div>`;
+  });
+})();
+
+// Seq length bars
+(function(){
+  const container = document.getElementById('seqlen-bars');
+  seqLenBins.forEach(b=>{
+    container.innerHTML += `<div class="seqlen-row">
+      <div class="seqlen-header">
+        <span style="color:var(--text);font-size:11px">${b.l}</span>
+        <span style="color:var(--muted);font-size:10px">n≈${b.n.toLocaleString()} proteins</span>
+      </div>
+      <div class="seqlen-bar">
+        <div style="flex:${b.vh};background:var(--vhigh);opacity:.85" title="Very High: ${b.vh}%"></div>
+        <div style="flex:${b.h};background:var(--high);opacity:.85" title="High: ${b.h}%"></div>
+        <div style="flex:${b.m};background:var(--med);opacity:.85" title="Med: ${b.m}%"></div>
+        <div style="flex:${b.lo};background:var(--low);opacity:.65" title="Low: ${b.lo}%"></div>
+      </div>
+      <div class="seqlen-leg">
+        <span style="color:var(--vhigh)">VH ${b.vh}%</span>
+        <span style="color:var(--high)">H ${b.h}%</span>
+        <span style="color:var(--med)">M ${b.m}%</span>
+        <span style="color:var(--low)">L ${b.lo}%</span>
+      </div>
+    </div>`;
+  });
+})();
+
+// Limitations
+(function(){
+  const grid = document.getElementById('limit-grid');
+  limitData.forEach(lim=>{
+    const severityColor = lim.sev==='high' ? '#ff6b6b' : lim.sev==='medium' ? '#ffb703' : '#06d6a0';
+    const card = document.createElement('div');
+    card.className='limit-card';
+    card.innerHTML = `
+      <div class="limit-card-head">
+        <div class="limit-title">${lim.t}</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="tag" style="color:${severityColor};border-color:${severityColor}55;background:${severityColor}15">${lim.sev==='high'?'High Impact':lim.sev==='medium'?'Medium':'Low'}</span>
+          <span class="chevron" style="color:var(--muted);font-size:12px">▼</span>
+        </div>
+      </div>
+      <div class="limit-desc">${lim.d}</div>
+      <div class="limit-body">
+        <div class="limit-workaround">
+          <div class="limit-label" style="color:var(--green)">Workaround</div>
+          <div style="color:var(--text);font-size:11px;line-height:1.55">${lim.w}</div>
+        </div>
+        <div class="limit-example" style="background:rgba(255,183,3,.05);border-color:rgba(255,183,3,.3)">
+          <div class="limit-label" style="color:var(--med)">Example</div>
+          <div style="color:var(--text);font-size:11px">${lim.e}</div>
+        </div>
+      </div>`;
+    card.addEventListener('click', ()=>{
+      card.classList.toggle('open');
+      card.querySelector('.chevron').textContent = card.classList.contains('open') ? '▲' : '▼';
+    });
+    grid.appendChild(card);
+  });
+})();
+
+// Case study cards
+(function(){
+  const container = document.getElementById('case-cards');
+  let openId = null;
+  caseData.forEach(p=>{
+    const card = document.createElement('div');
+    card.className='case-card';
+    card.innerHTML = `
+      <div class="case-head">
+        <span class="case-icon" style="color:${p.col}">${p.icon}</span>
+        <div class="case-meta">
+          <div style="display:flex;justify-content:space-between">
+            <div>
+              <div class="case-name">${p.name}</div>
+              <div class="case-full">${p.full}</div>
+            </div>
+            <div class="case-score">
+              <div class="case-plddt" style="color:${p.col}">${p.plddt}</div>
+              <div class="case-score-label">median pLDDT</div>
+            </div>
+          </div>
+          <div class="case-tags">
+            <span class="tag" style="color:${p.col};border-color:${p.col}55;background:${p.col}15">${p.type}</span>
+            <span class="tag" style="color:${p.col};border-color:${p.col}55;background:${p.col}15">${p.uni}</span>
+            <span class="tag" style="color:${p.col};border-color:${p.col}55;background:${p.col}15">Active site: ${p.aplddt}</span>
+          </div>
+        </div>
+      </div>
+      <div class="case-body">
+        <div class="case-section-label">Function</div>
+        <div class="case-function">${p.fn}</div>
+        <div class="case-section-label">Structural Insights</div>
+        ${p.ins.map(i=>`<div class="case-insight"><span class="case-insight-arrow" style="color:${p.col}">›</span><span class="case-insight-text">${i}</span></div>`).join('')}
+        <div class="case-drug"><div class="case-drug-label">Drug / Disease Relevance</div><div class="case-drug-text">${p.drug}</div></div>
+        <div class="case-meta2">Novelty: <span style="color:var(--text)">${p.novel}</span></div>
+        <div class="case-meta2">Topology: <span style="color:var(--text)">${p.topo}</span></div>
+      </div>`;
+    card.addEventListener('click', ()=>{
+      const wasOpen = openId===p.id;
+      document.querySelectorAll('.case-card').forEach(c=>c.classList.remove('open'));
+      openId = wasOpen ? null : p.id;
+      if (!wasOpen) card.classList.add('open');
+    });
+    container.appendChild(card);
+  });
+})();
+</script>
+</body>
+</html>
